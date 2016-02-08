@@ -3,23 +3,24 @@
 This protocol is a much simpler interface to the Carwings telematics information.
 The original protocol was an XML SOAP API and was a bit of a pain to work with.
 
-Every operation is executed as a simple HTTP GET request and responds with JSON documents.
-Parameters for the operation are encoded on the querystring. For simple testing/scripting,
+Every operation is executed as a simple HTTP GET request and responds with a JSON document.
+Parameters for the operation are encoded on the querystring, and for simple testing/scripting,
 most of these operations will work by simply pasting the URI into your browser address bar.
 
 The only operation that requires any kind of credentials is the User Login operation.
-All other operations take the `DCMID` and the `VIN` of your vehicle as parameters for authorizing the requested operation.
+All other operations take the `DCMID` and the `VIN` pair of a vehicle as parameters for authorizing the requested operation.
 
-All of the responses documents have a `message` and `status` property to signal operation success/failure messages and status.
-The `status` seems to mirror the HTTP reponse code and `message` seems to be "success" for successful operations.
+All of the response documents have a `message` and `status` property to signal operation success/failure.
+The `status` is a numerical value that is `200` on success, and `message` is a string that is "success" for successful operations.
 
 ## Long Polled Operations
 
-Operations that dispatch a request to the vehicle follow a long polling pattern. For these long poll operations, there is an operation to initiate the vehicle request and returns a `resultKey` property.
-The value of this key can be used as a parameter to a matching `*Result` operation to poll for the operation results.
+Operations that dispatch a request to the vehicle follow a long polling pattern. There are a pair of operations for these types of requests.
+The first is an operation to initiate the vehicle request. The result of these initiating operations is a `resultKey`.
+The value of this key can be used as a parameter to the matching `*Result` operation to poll for the operation completion and result.
 
 These result operations return a document that contains a `responseFlag` property.
-When this property comes back `0`, the vehicle response is still pending. When it returns `1`, the vehicle request has been completed and the document contains the response properties.
+When this property comes back `0`, the vehicle response is still pending. When it returns `1`, the vehicle request has been completed and the document contains the operation result properties.
 
 ## User Login
 
@@ -92,6 +93,38 @@ response:
 ```
 
 ## Get Cached Vehicle Status
+
+This operation returns the status information that the service currently has cached for the requested vehicle, without dispatching a status update request.
+
+url: `https://gdcportalgw.its-mo.com/orchestration_1111/gdc/BatteryStatusRecordsRequest.php?RegionCode=NNA&lg=en-US&DCMID=<dcmid>&VIN=<vin>&tz=America/Denver&TimeFrom=2014-07-04T20:42:40`
+
+response:
+```
+{
+    "BatteryStatusRecords": {
+        "BatteryStatus": {
+            "BatteryCapacity": "12",
+            "BatteryChargingStatus": "NORMAL_CHARGING",
+            "BatteryRemainingAmount": "9",
+            "BatteryRemainingAmountWH": "",
+            "BatteryRemainingAmountkWH": ""
+        },
+        "CruisingRangeAcOff": "101904.0",
+        "CruisingRangeAcOn": "94184.0",
+        "NotificationDateAndTime": "2016/01/08 21:26",
+        "OperationDateAndTime": "Jan  8, 2016 02:26 PM",
+        "OperationResult": "START",
+        "PluginState": "CONNECTED",
+        "TargetDate": "2016/01/08 21:26",
+        "TimeRequiredToFull200_6kW": {
+            "HourRequiredToFull": "2",
+            "MinutesRequiredToFull": "30"
+        }
+    },
+    "message": "success",
+    "status": 200
+}
+```
 
 ## Initiate Status Update
 
