@@ -1,7 +1,7 @@
 # Carwings JSON API Protocol
 
 This protocol is a much simpler interface to the Carwings telematics information.
-The original protocol was an XML SOAP API and was a bit of a pain to work with.
+The original protocol was an XML SOAP API and was a bit of a pain to work with. Requests to this protocol began failing in February 2016 signaling its decomissioning.
 
 Every operation is executed as a simple HTTP GET request and responds with a JSON document.
 Parameters for the operation are encoded on the querystring, and for simple testing/scripting,
