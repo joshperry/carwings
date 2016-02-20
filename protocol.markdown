@@ -297,6 +297,12 @@ The URLs to use to turn off the HVAC are:
 - Request: `https://gdcportalgw.its-mo.com/orchestration_1111/gdc/ACRemoteOffRequest.php?RegionCode=NNA&lg=en-US&DCMID=<dcmid>&VIN=<vin>&tz=America/Denver`
 - Long-polling (result): `https://gdcportalgw.its-mo.com/orchestration_1111/gdc/ACRemoteOffResult.php?RegionCode=NNA&lg=en-US&DCMID=<dcmid>&VIN=<vin>&tz=America/Denver&resultKey=<key>&UserId=<userid>`
 
+## Start Charging
+
+url: `https://gdcportalgw.its-mo.com/orchestration_1111/gdc/BatteryRemoteChargingRequest.php?RegionCode=NNA&lg=en-US&DCMID=<dcmid>&VIN=<vin>&tz=America/Denver&ExecuteTime=2016-02-20`
+
+Value for `ExecuteTime` seems to be today's date.
+
 ## RegionCode
 
 For Canada, change the `regionCode` parameter from `NNA` to `NCI`.
