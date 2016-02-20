@@ -217,6 +217,8 @@ response:
 
 ## HVAC Remote Activate Result
 
+url: `https://gdcportalgw.its-mo.com/orchestration_1111/gdc/ACRemoteResult.php?RegionCode=NNA&lg=en-US&DCMID=<dcmid>&VIN=<vin>&tz=America/Denver&resultKey=<key>&UserId=<userid>`
+
 pending response:
 ```
 {
@@ -237,6 +239,13 @@ completed response (with battery too low to activate):
     "timeStamp": "2016-02-07 21:35:34"
 }
 ```
+
+## HVAC Remote Deactivate
+
+The URLs to use to turn off the HVAC are:
+
+- Request: `https://gdcportalgw.its-mo.com/orchestration_1111/gdc/ACRemoteOffRequest.php?RegionCode=NNA&lg=en-US&DCMID=<dcmid>&VIN=<vin>&tz=America/Denver`
+- Long-polling (result): `https://gdcportalgw.its-mo.com/orchestration_1111/gdc/ACRemoteOffResult.php?RegionCode=NNA&lg=en-US&DCMID=<dcmid>&VIN=<vin>&tz=America/Denver&resultKey=<key>&UserId=<userid>`
 
 ## RegionCode
 
