@@ -237,3 +237,9 @@ completed response (with battery too low to activate):
     "timeStamp": "2016-02-07 21:35:34"
 }
 ```
+
+## RegionCode
+
+For Canada, change the `regionCode` parameter from `NNA` to `NCI`.
+
+Example: `https://gdcportalgw.its-mo.com/orchestration_1111/gdc/ACRemoteRequest.php?RegionCode=NCI&lg=en-US&DCMID=<dcmid>&VIN=<vin>&tz=America/Montreal`
