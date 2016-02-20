@@ -195,6 +195,56 @@ completed response:
 }
 ```
 
+## HVAC Status
+
+To get the status of the HVAC (Climate Control), use the following request.
+
+url: `https://gdcportalgw.its-mo.com/orchestration_1111/gdc/RemoteACRecordsRequest.php?RegionCode=NNA&lg=en-US&DCMID=<dcmid>&VIN=<vin>&tz=America/Denver&TimeFrom=2014-07-04T20:42:40`
+
+Response (when Climate Control is ON):
+```
+{
+	"status": 200,
+	"message": "success",
+	"RemoteACRecords": {
+		"OperationResult": "START",
+		"OperationDateAndTime": "Feb 20, 2016 05:51 PM",
+		"RemoteACOperation": "START",
+		"ACStartStopDateAndTime": "Feb 20, 2016 05:52 PM",
+		"CruisingRangeAcOn": "65520.0",
+		"CruisingRangeAcOff": "90480.0",
+		"ACStartStopURL": "",
+		"PluginState": "CONNECTED",
+		"ACDurationBatterySec": "900",
+		"ACDurationPluggedSec": "7200"
+	},
+	"OperationDateAndTime": ""
+}
+```
+
+Response (when Climate Control is OFF):
+```
+{
+	"status": 200,
+	"message": "success",
+	"RemoteACRecords": {
+		"OperationResult": "START",
+		"OperationDateAndTime": "Feb 20, 2016 05:54 PM",
+		"RemoteACOperation": "STOP",
+		"ACStartStopDateAndTime": "Feb 20, 2016 05:55 PM",
+		"CruisingRangeAcOn": "68880.0",
+		"CruisingRangeAcOff": "95120.0",
+		"ACStartStopURL": "",
+		"PluginState": "CONNECTED",
+		"ACDurationBatterySec": "900",
+		"ACDurationPluggedSec": "7200"
+	},
+	"OperationDateAndTime": ""
+}
+```
+
+Also available: get Climate Control timer settings: `https://gdcportalgw.its-mo.com/orchestration_1111/gdc/GetScheduledACRemoteRequest.php?RegionCode=NNA&lg=en-US&DCMID=<dcmid>&VIN=<vin>&tz=America/Denver`
+
 ## HVAC Remote Activate
 
 This operation sends a command to turn the HVAC system on in the car.
