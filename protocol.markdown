@@ -7,8 +7,8 @@ Every operation is executed as a simple HTTP GET request and responds with a JSO
 Parameters for the operation are encoded on the querystring, and for simple testing/scripting,
 most of these operations will work by simply pasting the URI into your browser address bar.
 
-The only operation that requires any kind of credentials is the User Login operation.
-All other operations take the `DCMID` and the `VIN` pair of a vehicle as parameters for authorizing the requested operation.
+The only operation that requires any kind of credentials is the *User Login* operation.
+All other operations take a `custom_sessionid` that is negotiate during a two-phase authentication exchange.
 
 All of the response documents have a `message` and `status` property to signal operation success/failure.
 The `status` is a numerical value that is `200` on success, and `message` is a string that is "success" for successful operations.
@@ -22,12 +22,65 @@ The value of this key can be used as a parameter to the matching `*Result` opera
 These result operations return a document that contains a `responseFlag` property.
 When this property comes back `0`, the vehicle response is still pending. When it returns `1`, the vehicle request has been completed and the document contains the operation result properties.
 
+## Security Compromise
+
+In February of 2016 it was found that the API actually ignored the assumed requirement to privide the proper `DCMID` in requests after the initial login.
+This resulted in the ability to send operations to any target vehicle having only its VIN.
+An update was subsequently released in March of the same year that resulted in the auth scheme described in the current version of this document.
+
+In the update, the base path of the URI for API calls was changed from `orchestration_1111` to `gworchest_0307C`.
+This is most likely a versioning scheme similar to other JSON APIs that use something like `v1` to `v2` to allow concurrent usage of different API versions.
+In the case of the Carwings API, the old version has been completely replaced by this new revision.
+
+Finally, in the face of this compromise was that the requests were changed to use the HTTP `POST` method when previously they exclusively used `GET`.
+
 ## User Login
 
-This operation will allow you to authenticate, view the owner's profile information.
-This profile includes a list of the owner's vehicles and each of their VIN and DCMID values--which you'll need to make requests directed at a specific vehicle.
+> ### Security Changes
+>
+> After the security flaw discovery there was a major change to the way API auth works. I think it is interesting to consider the changes that were made in the name of security.
+>
+> Even though the API interactions are already covered by transport security, Nissan felt the need to obfuscate the user password using a two-phase exchange that involves encrypting the user's password using a key provide in phase 1.
+> 
+> Since the encryption key is provided in the same communication channel, this provides no additional security against MITM, downgrade, or data compromise attacks.
+> As such I think we can only consider this particular dance to be, at the best, obfuscation.
+>
+> We might also consider the inclusion of sensitive data in querystring as an unnecessary security risk. Though this is not uncommon, it is still against many recommendations as the URI is often logged by applications, servers, and proxys.
+> 
+> However, the fact that it now *seems* to use unique cryptographically secure session keys and has moved to using `POST` are both definite wins for the security of the Carwings API and all of our vehicles.
 
-url: `https://gdcportalgw.its-mo.com/orchestration_1111/gdc/UserLoginRequest.php?RegionCode=NNA&lg=en-US&DCMID=&VIN=&tz=&UserId=<email>&Password=<password>`
+The authentication scheme used by the API happens in two phases.
+
+In addition to the steps described here, the auth system also requires an additional parameter to be included in all requests.
+This parameter is currently: `initial_app_strings=geORNtsZe5I4lRGjG9GZiA`.
+
+### Phase 1
+
+The first phase of the exchange is to call the `InitialApp` operation and retrieve the `baseprm` value from the response. This value is the encryption key used to derive credentials for phase 2.
+
+url: `https://gdcportalgw.its-mo.com/gworchest_0307C/gdc/InitialApp.php?RegionCode=NNA&lg=en-US&DCMID=&VIN=&custom_sessionid=&VIN=&tz=&UserId=<email>&Password=<base64_cipher_password>&initial_app_strings=geORNtsZe5I4lRGjG9GZiA`
+
+response:
+```
+{
+    "status":200,
+    "message":"success",
+    "baseprm":"uyI5Dj9g8VCOFDnBRUbr3g"
+}
+```
+
+*NB*: This operation's response currently specifies an incorrect `Content-Type: text/html; charset=UTF8`.
+
+### Phase 2
+
+To call the phase 2 `UserLoginRequest` operation, the `baseprm` value is used to encrypt the user's password with Blowfish ECB encryption and PKCS5 padding.
+The resultant ciphertext is then provided as the `Password` parameter of the login operation in a base64 encoded format.
+
+The owner's profile is included in response and has a list of their vehicles, each of their VINs and DCMIDs which you'll need to make requests directed at a specific vehicle.
+
+The response list (`vehicleInfo` note the lowercase "v") also includes the `custom_sessionid` which is used for authorization and must be included as a parameter in all subsequent requests.
+
+url: `https://gdcportalgw.its-mo.com/gworchest_0307C/gdc/UserLoginRequest.php?RegionCode=NNA&lg=en-US&DCMID=&VIN=&custom_sessionid=&tz=&UserId=<email>&Password=<base64_cipher_password>&initial_app_strings=geORNtsZe5I4lRGjG9GZiA`
 
 response:
 ```
@@ -45,7 +98,7 @@ response:
         "VehicleInfo": {
             "DCMID": "<dcmid>",
             "EncryptedNAVIID": "<redacted>",
-            "LastDCMUseTime": "Feb  7, 2016 02:58 PM",
+            "LastDCMUseTime": "Dec 12, 2016 05:26 PM",
             "LastVehicleLoginTime": "",
             "MSN": "<redacted>",
             "NAVIID": "<redacted>",
@@ -68,24 +121,24 @@ response:
         "vehicleInfo": [
             {
                 "charger20066": "false",
+                "custom_sessionid": "<custom_sessionid>",
                 "nickname": "<carName>",
                 "telematicsEnabled": "true",
                 "vin": "<vin>"
             }
         ]
     },
-    "message": "success",
     "sessionId": "<redacted>",
     "status": 200,
     "vehicle": {
         "profile": {
             "dcmId": "<dcmid>",
             "encAuthToken": "<redacted>",
-            "gdcPassword": "<redacted>",
-            "gdcUserId": "<userid>",
-            "nickname": "userid",
+            "gdcPassword": "",
+            "gdcUserId": "",
+            "nickname": "<userid>",
             "status": "ACCEPTED",
-            "statusDate": "Jul  3, 2014 06:00 PM",
+            "statusDate": "Jul  4, 2014 12:00 AM",
             "vin": "<vin>"
         }
     }
@@ -96,7 +149,7 @@ response:
 
 This operation returns the status information that the service currently has cached for the requested vehicle, without dispatching a status update request.
 
-url: `https://gdcportalgw.its-mo.com/orchestration_1111/gdc/BatteryStatusRecordsRequest.php?RegionCode=NNA&lg=en-US&DCMID=<dcmid>&VIN=<vin>&tz=America/Denver&TimeFrom=2014-07-04T20:42:40`
+url: `https://gdcportalgw.its-mo.com/gworchest_0307C/gdc/BatteryStatusRecordsRequest.php?RegionCode=NNA&lg=en-US&DCMID=<dcmid>&VIN=<vin>&custom_sessionid=<custom_sessionid>&tz=America/Denver&TimeFrom=2014-07-04T20:42:40`
 
 response:
 ```
@@ -134,7 +187,7 @@ Call this operation to initiate a refresh of the vehicle's status.
 *long-poll request*
 Use the Status Update Result operation to poll for results.
 
-url: `https://gdcportalgw.its-mo.com/orchestration_1111/gdc/BatteryStatusCheckRequest.php?RegionCode=NNA&lg=en-US&DCMID=<dcmid>&VIN=<vin>&tz=America/Denver&UserId=<userid>`
+url: `https://gdcportalgw.its-mo.com/gworchest_0307C/gdc/BatteryStatusCheckRequest.php?RegionCode=NNA&lg=en-US&DCMID=<dcmid>&VIN=<vin>&custom_sessionid=<custom_sessionid>&tz=America/Denver&UserId=<userid>`
 
 response:
 ```
@@ -152,7 +205,7 @@ response:
 As long as the `responseFlag` property is `0` in the response, the update request is still awaiting a response from the vehicle.
 When this value comes back `1`, then the document will also be filled with the vehicle status properties.
 
-url: `https://gdcportalgw.its-mo.com/orchestration_1111/gdc/BatteryStatusCheckResultRequest.php?RegionCode=NNA&lg=en-US&DCMID=<dcmid>&VIN=<vin>&tz=America/Denver&resultKey=<key>&UserId=<userid>`
+url: `https://gdcportalgw.its-mo.com/gworchest_0307C/gdc/BatteryStatusCheckResultRequest.php?RegionCode=NNA&lg=en-US&DCMID=<dcmid>&VIN=<vin>&custom_sessionid=<custom_sessionid>&tz=America/Denver&resultKey=<key>&UserId=<userid>`
 
 pending response:
 ```
@@ -199,7 +252,7 @@ completed response:
 
 To get the status of the HVAC (Climate Control), use the following request.
 
-url: `https://gdcportalgw.its-mo.com/orchestration_1111/gdc/RemoteACRecordsRequest.php?RegionCode=NNA&lg=en-US&DCMID=<dcmid>&VIN=<vin>&tz=America/Denver&TimeFrom=2014-07-04T20:42:40`
+url: `https://gdcportalgw.its-mo.com/gworchest_0307C/gdc/RemoteACRecordsRequest.php?RegionCode=NNA&lg=en-US&DCMID=<dcmid>&VIN=<vin>&custom_sessionid=<custom_sessionid>&tz=America/Denver&TimeFrom=2014-07-04T20:42:40`
 
 Response (when Climate Control is ON):
 ```
@@ -243,7 +296,7 @@ Response (when Climate Control is OFF):
 }
 ```
 
-Also available: get Climate Control timer settings: `https://gdcportalgw.its-mo.com/orchestration_1111/gdc/GetScheduledACRemoteRequest.php?RegionCode=NNA&lg=en-US&DCMID=<dcmid>&VIN=<vin>&tz=America/Denver`
+Also available: get Climate Control timer settings: `https://gdcportalgw.its-mo.com/gworchest_0307C/gdc/GetScheduledACRemoteRequest.php?RegionCode=NNA&lg=en-US&DCMID=<dcmid>VIN=<vin>&custom_sessionid=<custom_sessionid>&tz=America/Denver`
 
 ## HVAC Remote Activate
 
@@ -252,7 +305,7 @@ This operation sends a command to turn the HVAC system on in the car.
 *long-poll operation*
 Use the HVAC Remote Activate Result operation to poll for results.
 
-url: `https://gdcportalgw.its-mo.com/orchestration_1111/gdc/ACRemoteRequest.php?RegionCode=NNA&lg=en-US&DCMID=<dcmid>&VIN=<vin>&tz=America/Denver`
+url: `https://gdcportalgw.its-mo.com/gworchest_0307C/gdc/ACRemoteRequest.php?RegionCode=NNA&lg=en-US&DCMID=<dcmid>&VIN=<vin>&custom_sessionid=<custom_sessionid>&tz=America/Denver`
 
 response:
 ```
@@ -267,7 +320,7 @@ response:
 
 ## HVAC Remote Activate Result
 
-url: `https://gdcportalgw.its-mo.com/orchestration_1111/gdc/ACRemoteResult.php?RegionCode=NNA&lg=en-US&DCMID=<dcmid>&VIN=<vin>&tz=America/Denver&resultKey=<key>&UserId=<userid>`
+url: `https://gdcportalgw.its-mo.com/gworchest_0307C/gdc/ACRemoteResult.php?RegionCode=NNA&lg=en-US&DCMID=<dcmid>&VIN=<vin>&custom_sessionid=<custom_sessionid>&tz=America/Denver&resultKey=<key>&UserId=<userid>`
 
 pending response:
 ```
@@ -292,19 +345,19 @@ completed response (with battery too low to activate):
 
 ## HVAC Remote Deactivate
 
-The URLs to use to turn off the HVAC are:
+The URLs used to turn the HVAC off:
 
-- Request: `https://gdcportalgw.its-mo.com/orchestration_1111/gdc/ACRemoteOffRequest.php?RegionCode=NNA&lg=en-US&DCMID=<dcmid>&VIN=<vin>&tz=America/Denver`
-- Long-polling (result): `https://gdcportalgw.its-mo.com/orchestration_1111/gdc/ACRemoteOffResult.php?RegionCode=NNA&lg=en-US&DCMID=<dcmid>&VIN=<vin>&tz=America/Denver&resultKey=<key>&UserId=<userid>`
+- Request: `https://gdcportalgw.its-mo.com/gworchest_0307C/gdc/ACRemoteOffRequest.php?RegionCode=NNA&lg=en-US&DCMID=<dcmid>VIN=<vin>&custom_sessionid=<custom_sessionid>&tz=America/Denver`
+- Long-polling (result): `https://gdcportalgw.its-mo.com/gworchest_0307C/gdc/ACRemoteOffResult.php?RegionCode=NNA&lg=en-US&DCMID=<dcmid>&VIN=<vin>&custom_sessionid=<custom_sessionid>&tz=America/Denver&resultKey=<key>&UserId=<userid>`
 
 ## Start Charging
 
-url: `https://gdcportalgw.its-mo.com/orchestration_1111/gdc/BatteryRemoteChargingRequest.php?RegionCode=NNA&lg=en-US&DCMID=<dcmid>&VIN=<vin>&tz=America/Denver&ExecuteTime=2016-02-20`
+url: `https://gdcportalgw.its-mo.com/gworchest_0307C/gdc/BatteryRemoteChargingRequest.php?RegionCode=NNA&lg=en-US&DCMID=<dcmid>VIN=<vin>&custom_sessionid=<custom_sessionid>&tz=America/Denver&ExecuteTime=2016-02-20`
 
 Value for `ExecuteTime` seems to be today's date.
 
 ## RegionCode
 
-For Canada, change the `regionCode` parameter from `NNA` to `NCI`.
+For different regions you must use the proper `regionCode`. For example, in Canada the region code is `NCI`.
 
-Example: `https://gdcportalgw.its-mo.com/orchestration_1111/gdc/ACRemoteRequest.php?RegionCode=NCI&lg=en-US&DCMID=<dcmid>&VIN=<vin>&tz=America/Montreal`
+Example URI: `https://gdcportalgw.its-mo.com/gworchest_0307C/gdc/ACRemoteRequest.php?RegionCode=NCI&lg=en-US&DCMID=<dcmid>&VIN=<vin>&custom_sessionid=<custom_sessionid>&tz=America/Montreal`
