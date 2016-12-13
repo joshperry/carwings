@@ -1,0 +1,46 @@
+{
+  "name": "carwings",
+  "version": "0.1.0",
+  "description": "A javascript library for interacting with the Nissan Leaf Carwings API.",
+  "main": "lib/index.js",
+  "scripts": {
+    "bstart": "babel-node src/index.js",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "babel src --out-dir lib"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/joshperry/carwings.git"
+  },
+  "keywords": [
+    "carwings",
+    "nissan",
+    "leaf"
+  ],
+  "author": "Joshua Perry <josh@pdk.io>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/joshperry/carwings/issues"
+  },
+  "homepage": "https://github.com/joshperry/carwings#readme",
+  "devDependencies": {
+    "babel-cli": "^6.18.0",
+    "babel-preset-env": "^1.0.2"
+  },
+  "babel": {
+    "presets": [
+      [
+        "env",
+        {
+          "targets": {
+            "node": 6.9
+          }
+        }
+      ]
+    ]
+  },
+  "dependencies": {
+    "axios": "^0.15.3",
+    "lodash": "^4.17.2"
+  }
+}
