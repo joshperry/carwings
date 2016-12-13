@@ -1,9 +1,10 @@
 module.exports = {
-  presets: [
-    ['env', {
-      targets: {
-        node: 'current'
-      }
-    }]
-  ];
-}
+  parserOptions: {
+    ecmaVersion: 8,
+    sourceType: 'module'
+  },
+  env: {
+    node: true
+  }
+};
+
