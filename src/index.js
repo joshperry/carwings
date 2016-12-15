@@ -1,5 +1,3 @@
-'use strict';
-
 import { createCipheriv } from 'crypto';
 import _ from 'lodash/fp';
 import axios from 'axios';
@@ -8,59 +6,113 @@ import querystring from 'querystring';
 axios.defaults.headers.post['Content-Type'] = 'application/x-www-form-urlencoded';
 axios.defaults.baseURL = 'https://gdcportalgw.its-mo.com';
 
+process.on('unhandledRejection', r => console.log(r));
+
 const initial_app_strings = 'geORNtsZe5I4lRGjG9GZiA';
 const RegionCode = 'NNA';
 const lg = 'en-US';
 const tz = 'America/Denver';
 
+const tlog = t => _.thru(d => console.log(t, d));
+
 function sleep(ms = 0) {
   return new Promise(r => setTimeout(r, ms));
 }
 
-function blowpassword(plainpass, key) {
+async function oauthenticate(api, email, password) {
+  let key = await api('InitialApp', {
+    initial_app_strings
+  }).baseprm;
+
+  let profile = await api('UserLoginRequest', {
+    RegionCode,
+    UserId: email,
+    Password: blowpassword(key, password),
+    initial_app_strings
+  });
+
+  const custom_sessionid = getsessionid(profile);
+
+  let session = async (action, data) => {
+    return await api(action, { RegionCode, ...data, custom_sessionid });
+  };
+
+  return { profile, session };
+}
+
+export async function api(action, data) {
+  let resp = await axios.post(`/gworchest_160803A/gdc/${action}.php`, querystring.stringify(data));
+
+  if(resp.data.status === 200) {
+    console.log(`api ${action} 👍`);
+    return resp.data;
+  } else {
+    console.log(`api ${action} 👎\r\n`, resp);
+    throw new Error(resp.data.ErrorMessage);
+  }
+}
+
+let blowpassword = _.curry((key, plainpass) => {
   let cipher = createCipheriv('bf-ecb', key, '');
 
   let encpass = cipher.update(plainpass, 'utf8', 'base64');
   encpass += cipher.final('base64');
 
   return encpass;
+});
+
+function getsessionid(profile) {
+  return profile.VehicleInfoList.vehicleInfo[0].custom_sessionid;
 }
 
-async function api(action, data) {
-  let resp = await axios.post(`/gworchest_160803A/gdc/${action}.php`, querystring.stringify(data));
-
-  if(resp.data.status === 200) {
-    return resp.data;
-  } else {
-    throw new Error(resp.data.ErrorMessage);
-  }
+function getvin(profile) {
+  return profile.VehicleInfoList.vehicleInfo[0].vin;
 }
 
-async function authenticate(email, password) {
-  data = await api('InitialApp', {
-    initial_app_strings
-  });
-  const key = data.baseprm;
+const acompose  = (fn, ...rest) =>
+  rest.length
+    ? async (...args) =>
+        fn(await acompose(...rest)(...args))
+    : fn;
 
-  data = await api('UserLoginRequest', {
+let challenge = acompose(
+  r => r.baseprm,
+  () => api('InitialApp', { initial_app_strings }),
+);
+
+// rawCredentials => apiCredentials
+let genCredentials = async (UserId, password) => {
+  return _.compose(
+    Password => ({ UserId, Password }),
+    blowpassword(await challenge()),
+  )(password);
+};
+
+// apiCredentials => profile
+let userLogin = async (credentials) => {
+  return await api('UserLoginRequest', {
     RegionCode,
-    UserId: email,
-    Password: blowpassword(password, key),
-    initial_app_strings
+    initial_app_strings,
+    ...credentials
   });
+};
 
-  return {
-    custom_sessionid: data.VehicleInfoList.vehicleInfo[0].custom_sessionid,
-    VIN: data.VehicleInfoList.vehicleInfo[0].vin
-  };
-}
+// rawCredentials => profile
+let authenticate = acompose(userLogin, genCredentials);
+
+// rawCredentials => (apioperation => apiresults)
+let loginSession = acompose(
+  s => async (action, data) => await api(action, { ...s, ...data }),
+  p => ({ custom_sessionid: getsessionid(p), VIN: getvin(p) }),
+  authenticate,
+);
 
 (async function() {
-  let data;
+  let session = await loginSession('bobbytables@gmail.com', 'Tr0ub4dor&3');
 
-  //TMP
-  const custom_sessionid = 'blah';
-  const VIN = 'blah';
+  let data = await session('BatteryStatusRecordsRequest', { RegionCode });
+
+  //let carsession = data => session({ ...data, profile.VehicleInfoList.vehicleInfo[0].vin });
 
   /*
   data = await api('InitialApp', {
@@ -70,8 +122,8 @@ async function authenticate(email, password) {
 
   data = await api('UserLoginRequest', {
     RegionCode,
-    UserId: 'blah',
-    Password: blowpassword('blah', key),
+    UserId: 'email@example.com',
+    Password: blowpassword('Tr0ub4dor&3', key),
     initial_app_strings
   });
   */

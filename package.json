@@ -25,6 +25,7 @@
   "homepage": "https://github.com/joshperry/carwings#readme",
   "devDependencies": {
     "babel-cli": "^6.18.0",
+    "babel-plugin-transform-object-rest-spread": "^6.20.2",
     "babel-preset-env": "^1.0.2"
   },
   "babel": {
@@ -37,9 +38,18 @@
           }
         }
       ]
+    ],
+    "plugins": [
+      [
+        "transform-object-rest-spread",
+        {
+          "useBuiltIns": true
+        }
+      ]
     ]
   },
   "dependencies": {
+    "asyncp": "^0.8.0",
     "axios": "^0.15.3",
     "lodash": "^4.17.2"
   }
