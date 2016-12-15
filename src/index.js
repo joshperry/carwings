@@ -13,31 +13,10 @@ const RegionCode = 'NNA';
 const lg = 'en-US';
 const tz = 'America/Denver';
 
-const tlog = t => _.thru(d => console.log(t, d));
+const tlog = t => _.thru(d => { console.log(t, d); return d; });
 
 function sleep(ms = 0) {
   return new Promise(r => setTimeout(r, ms));
-}
-
-async function oauthenticate(api, email, password) {
-  let key = await api('InitialApp', {
-    initial_app_strings
-  }).baseprm;
-
-  let profile = await api('UserLoginRequest', {
-    RegionCode,
-    UserId: email,
-    Password: blowpassword(key, password),
-    initial_app_strings
-  });
-
-  const custom_sessionid = getsessionid(profile);
-
-  let session = async (action, data) => {
-    return await api(action, { RegionCode, ...data, custom_sessionid });
-  };
-
-  return { profile, session };
 }
 
 export async function api(action, data) {
@@ -52,7 +31,7 @@ export async function api(action, data) {
   }
 }
 
-let blowpassword = _.curry((key, plainpass) => {
+const blowpassword = _.curry((key, plainpass) => {
   let cipher = createCipheriv('bf-ecb', key, '');
 
   let encpass = cipher.update(plainpass, 'utf8', 'base64');
@@ -69,19 +48,21 @@ function getvin(profile) {
   return profile.VehicleInfoList.vehicleInfo[0].vin;
 }
 
-const acompose  = (fn, ...rest) =>
+const acompose = (fn, ...rest) =>
   rest.length
     ? async (...args) =>
         fn(await acompose(...rest)(...args))
     : fn;
 
-let challenge = acompose(
+const challenge = acompose(
   r => r.baseprm,
   () => api('InitialApp', { initial_app_strings }),
 );
 
+
+
 // rawCredentials => apiCredentials
-let genCredentials = async (UserId, password) => {
+const genCredentials = async (UserId, password) => {
   return _.compose(
     Password => ({ UserId, Password }),
     blowpassword(await challenge()),
@@ -89,7 +70,7 @@ let genCredentials = async (UserId, password) => {
 };
 
 // apiCredentials => profile
-let userLogin = async (credentials) => {
+const userLogin = async (credentials) => {
   return await api('UserLoginRequest', {
     RegionCode,
     initial_app_strings,
@@ -98,19 +79,44 @@ let userLogin = async (credentials) => {
 };
 
 // rawCredentials => profile
-let authenticate = acompose(userLogin, genCredentials);
+const authenticate = acompose(userLogin, genCredentials);
 
 // rawCredentials => (apioperation => apiresults)
-let loginSession = acompose(
+const loginSession = acompose(
   s => async (action, data) => await api(action, { ...s, ...data }),
   p => ({ custom_sessionid: getsessionid(p), VIN: getvin(p) }),
   authenticate,
 );
 
+const pollresult = _.curry(async (session, action, data, resultKey) => {
+  let result;
+  do {
+    await sleep(5000);
+    result = await session(action, { resultKey, ...data });
+  } while(result.responseFlag !== '1');
+
+  return result;
+});
+
+const longpollrequest = _.curry((action, pollaction, session, data) => {
+  return acompose(
+    pollresult(session, pollaction, data),
+    r => r.resultKey,
+    () => session(action, data),
+  )();
+});
+
+const batteryrecords = session => session('BatteryStatusRecordsRequest', { RegionCode });
+
+const hvacon = session => longpollrequest('ACRemoteRequest', 'ACRemoteResult', session, { RegionCode });
+const hvacoff = session => longpollrequest('ACRemoteOffRequest', 'ACRemoteOffResult', session, { RegionCode });
+
 (async function() {
   let session = await loginSession('bobbytables@gmail.com', 'Tr0ub4dor&3');
 
-  let data = await session('BatteryStatusRecordsRequest', { RegionCode });
+  //let data = await batteryrecords(session);
+
+  let data = await hvacon(session);
 
   //let carsession = data => session({ ...data, profile.VehicleInfoList.vehicleInfo[0].vin });
 
